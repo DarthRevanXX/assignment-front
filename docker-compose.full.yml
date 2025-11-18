@@ -1,0 +1,58 @@
+# Full stack docker-compose for running both frontend and backend
+#
+# Prerequisites:
+# 1. Clone both repositories in the same parent directory:
+#    git clone <backend-repo> task-manager-backend
+#    git clone <frontend-repo> task-manager-frontend
+#
+# 2. Run from the frontend directory:
+#    docker-compose -f docker-compose.full.yml up --build
+#
+# This will start both services and make them available at:
+# - Frontend: http://localhost:3000
+# - Backend:  http://localhost:8080
+# - Swagger:  http://localhost:8080/q/swagger-ui
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ../task-manager-backend
+      dockerfile: Dockerfile
+    container_name: task-manager-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - QUARKUS_PROFILE=prod
+      - QUARKUS_HTTP_PORT=8080
+      - QUARKUS_HTTP_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/q/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - task-manager-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-manager-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - task-manager-network
+
+networks:
+  task-manager-network:
+    driver: bridge
